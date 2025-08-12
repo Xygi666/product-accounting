@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Учёт продукции</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>Учёт готовой продукции</h1>
+  <div id="month-total">0 ₽</div>
+  <div id="sync-status">⏳ Готов к синхронизации</div>
+</header>
+
+<main>
+  <section id="account">
+    <h2>Добавить производство</h2>
+    <label>
+      Продукт:
+      <select id="product-select"></select>
+    </label>
+    <label>
+      Количество:
+      <input id="qty-input" type="number" min="0.1" step="0.1" value="1">
+    </label>
+    <button id="add-btn">Добавить запись</button>
+
+    <h2>Сегодня</h2>
+    <ul id="today-list"></ul>
+  </section>
+
+  <section id="settings" hidden>
+    <h2>Добавление продукции</h2>
+    <input id="new-name" placeholder="Название">
+    <input id="new-price" type="number" placeholder="Цена">
+    <button id="add-product-btn">Сохранить продукт</button>
+
+    <h3>Список продукции</h3>
+    <ul id="product-list"></ul>
+
+    <h3>GitHub синхронизация</h3>
+    <input id="github-owner" placeholder="GitHub логин">
+    <input id="github-repo" placeholder="Имя репозитория">
+    <input id="github-token" placeholder="Персональный токен">
+    <button id="save-github-btn">Сохранить настройки</button>
+    <button id="clear-data-btn" style="background:#f44336;">🗑 Очистить данные</button>
+  </section>
+</main>
+
+<nav>
+  <button data-page="account">📊 Учёт</button>
+  <button data-page="settings">⚙️ Настройки</button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
