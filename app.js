@@ -33,7 +33,7 @@ document.querySelectorAll('nav button').forEach(btn => {
   });
 });
 
-// ===== Обновление UI =====
+// ===== Интерфейс =====
 async function refreshProducts() {
   const products = await db('products', 'readonly', os => os.getAll());
   $('#product-select').innerHTML = products.map(
@@ -45,19 +45,21 @@ async function refreshProducts() {
 }
 
 async function loadToday() {
-  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const start = new Date();
+  start.setHours(0,0,0,0);
   const entries = await db('entries', 'readonly', os => os.getAll());
   $('#today-list').innerHTML = entries.filter(e => e.ts >= start.getTime())
     .map(e => {
       const t = new Date(e.ts).toLocaleTimeString();
       return `<li>${t} — ${e.productName} x${e.qty} = ${e.sum} ₽
-               <button onclick="deleteEntry(${e.id})">✕</button></li>`;
+        <button onclick="deleteEntry(${e.id})">✕</button></li>`;
     }).join('') || '<li>Нет данных</li>';
 }
 
 async function loadMonthSum() {
   const first = new Date();
-  first.setDate(1); first.setHours(0, 0, 0, 0);
+  first.setDate(1);
+  first.setHours(0,0,0,0);
   const entries = await db('entries', 'readonly', os => os.getAll());
   const total = entries.filter(e => e.ts >= first.getTime())
                        .reduce((sum, e) => sum + e.sum, 0);
@@ -123,12 +125,12 @@ $('#clear-data-btn').addEventListener('click', async () => {
   }
 });
 
-// ===== Синхронизация на GitHub =====
+// ===== СИНХ с GitHub =====
 async function syncToGitHub() {
-  const ownerSetting = await db('settings', 'readonly', os => os.get('github_owner'));
-  const repoSetting  = await db('settings', 'readonly', os => os.get('github_repo'));
-  const tokenSetting = await db('settings', 'readonly', os => os.get('github_token'));
-  
+  const ownerSetting = await db('settings','readonly', os => os.get('github_owner'));
+  const repoSetting  = await db('settings','readonly', os => os.get('github_repo'));
+  const tokenSetting = await db('settings','readonly', os => os.get('github_token'));
+
   if (!ownerSetting?.value || !repoSetting?.value || !tokenSetting?.value) {
     return updateSyncStatus('❌ Нет настроек GitHub');
   }
@@ -137,15 +139,16 @@ async function syncToGitHub() {
   const repo   = repoSetting.value;
   const token  = tokenSetting.value;
 
-  const products = await db('products', 'readonly', os => os.getAll());
-  const entries  = await db('entries', 'readonly', os => os.getAll());
+  const products = await db('products','readonly', os => os.getAll());
+  const entries  = await db('entries','readonly', os => os.getAll());
   const backup   = { products, entries, updated: new Date().toISOString() };
   const content  = btoa(unescape(encodeURIComponent(JSON.stringify(backup, null, 2))));
 
   const getUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
-  
-  // Получаем метаданные с sha
-  const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' };
+  const headers = {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github.v3+json' // важно для получения метаданных с sha
+  };
 
   let sha = null;
   const getResp = await fetch(getUrl, { headers });
@@ -165,17 +168,17 @@ async function syncToGitHub() {
   if (sha) {
     bodyObj.sha = sha;
   } else {
-    console.log('sha нет → файл создаётся впервые');
+    console.log('sha нет → создаём новый файл');
   }
 
   console.log('Отправляем PUT с телом:', bodyObj);
 
-  const putResp   = await fetch(getUrl, {
+  const putResp  = await fetch(getUrl, {
     method: 'PUT',
     headers,
     body: JSON.stringify(bodyObj)
   });
-  const respJson  = await putResp.json();
+  const respJson = await putResp.json();
   console.log('PUT status:', putResp.status);
   console.log('PUT response JSON:', respJson);
 
@@ -186,12 +189,12 @@ async function syncToGitHub() {
   }
 }
 
-// ===== Автоимпорт с GitHub =====
+// ===== Загрузка из GitHub =====
 async function loadFromGitHub() {
   const ownerSetting = await db('settings','readonly', os => os.get('github_owner'));
   const repoSetting  = await db('settings','readonly', os => os.get('github_repo'));
   const tokenSetting = await db('settings','readonly', os => os.get('github_token'));
-  
+
   if (!ownerSetting?.value || !repoSetting?.value || !tokenSetting?.value) {
     console.log('Нет настроек GitHub, пропускаем автозагрузку');
     return;
@@ -202,9 +205,10 @@ async function loadFromGitHub() {
   const token  = tokenSetting.value;
 
   const getUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
-  
-  // raw, чтобы получить голое содержимое файла
-  const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3.raw' };
+  const headers = {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github.v3.raw' // только содержимое
+  };
 
   try {
     const response = await fetch(getUrl, { headers });
@@ -213,17 +217,17 @@ async function loadFromGitHub() {
       const data = JSON.parse(text);
       console.log('Загружено содержимое с GitHub:', data);
 
-      await db('products', 'readwrite', os => os.clear());
-      await db('entries', 'readwrite', os => os.clear());
+      await db('products','readwrite', os => os.clear());
+      await db('entries','readwrite', os => os.clear());
 
       if (Array.isArray(data.products)) {
         for (const p of data.products) {
-          await db('products', 'readwrite', os => os.add(p));
+          await db('products','readwrite', os => os.add(p));
         }
       }
       if (Array.isArray(data.entries)) {
         for (const e of data.entries) {
-          await db('entries', 'readwrite', os => os.add(e));
+          await db('entries','readwrite', os => os.add(e));
         }
       }
 
@@ -241,13 +245,14 @@ async function loadFromGitHub() {
   }
 }
 
+// ===== Хелпер =====
 function updateSyncStatus(msg) {
   $('#sync-status').textContent = msg;
 }
 
-// ===== init =====
+// ===== INIT =====
 (async function init() {
-  await loadFromGitHub();
+  await loadFromGitHub(); // Сразу подтянуть данные
   refreshProducts();
   loadToday();
   loadMonthSum();
