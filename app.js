@@ -151,11 +151,11 @@ async function syncToGitHub() {
   if (getResp.ok) {
     const fileData = await getResp.json();
     sha = fileData.sha;
+    console.log('Полученный sha для data.json:', sha);
   } else if (getResp.status !== 404) {
     console.warn('GET data.json error:', await getResp.text());
   }
 
-  // Формируем тело запроса с добавлением sha только если он есть
   const bodyObj = {
     message: 'Backup update',
     content: content
@@ -163,6 +163,8 @@ async function syncToGitHub() {
 
   if (sha) {
     bodyObj.sha = sha;
+  } else {
+    console.log('sha отсутствует - файл создаётся впервые');
   }
 
   const putResp = await fetch(getUrl, {
