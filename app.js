@@ -126,23 +126,23 @@ $('#clear-data-btn').addEventListener('click', async () => {
 // ===== Sync to GitHub =====
 async function syncToGitHub() {
   const ownerSetting = await db('settings', 'readonly', os => os.get('github_owner'));
-  const repoSetting = await db('settings', 'readonly', os => os.get('github_repo'));
+  const repoSetting  = await db('settings', 'readonly', os => os.get('github_repo'));
   const tokenSetting = await db('settings', 'readonly', os => os.get('github_token'));
   
   if (!ownerSetting?.value || !repoSetting?.value || !tokenSetting?.value) {
     return updateSyncStatus('❌ Нет настроек GitHub');
   }
 
-  const owner = ownerSetting.value;
-  const repo = repoSetting.value;
-  const token = tokenSetting.value;
+  const owner  = ownerSetting.value;
+  const repo   = repoSetting.value;
+  const token  = tokenSetting.value;
 
   const products = await db('products', 'readonly', os => os.getAll());
-  const entries = await db('entries', 'readonly', os => os.getAll());
-  const backup = { products, entries, updated: new Date().toISOString() };
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(backup, null, 2))));
+  const entries  = await db('entries', 'readonly', os => os.getAll());
+  const backup   = { products, entries, updated: new Date().toISOString() };
+  const content  = btoa(unescape(encodeURIComponent(JSON.stringify(backup, null, 2))));
 
-  const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
+  const getUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' };
 
   let sha = null;
@@ -150,27 +150,31 @@ async function syncToGitHub() {
   console.log('GET data.json status:', getResp.status);
   if (getResp.ok) {
     const fileData = await getResp.json();
-    console.log('Ответ GET от GitHub:', fileData);
-    sha = fileData.sha;
+    console.log('Ответ от GitHub (полный JSON):', fileData);
+    if (fileData && typeof fileData.sha === 'string') {
+      sha = fileData.sha;
+    }
+    console.log('Полученный sha:', sha);
   } else if (getResp.status !== 404) {
     console.warn('Ошибка GET data.json:', await getResp.text());
   }
 
   const bodyObj = { message: 'Backup update', content };
-  if (typeof sha === 'string' && sha.length > 0) {
+  if (sha) {
     bodyObj.sha = sha;
+  } else {
+    console.log('sha нет → создаём файл заново');
   }
 
-  console.log('Тело PUT-запроса:', bodyObj);
+  console.log('Отправляем PUT с телом:', bodyObj);
 
-  const putResp = await fetch(getUrl, {
+  const putResp   = await fetch(getUrl, {
     method: 'PUT',
     headers,
     body: JSON.stringify(bodyObj)
   });
-
+  const respJson  = await putResp.json();
   console.log('PUT status:', putResp.status);
-  const respJson = await putResp.json();
   console.log('PUT response JSON:', respJson);
 
   if (putResp.ok) {
@@ -183,7 +187,7 @@ async function syncToGitHub() {
 // ===== Автоимпорт =====
 async function loadFromGitHub() {
   const ownerSetting = await db('settings','readonly', os => os.get('github_owner'));
-  const repoSetting = await db('settings','readonly', os => os.get('github_repo'));
+  const repoSetting  = await db('settings','readonly', os => os.get('github_repo'));
   const tokenSetting = await db('settings','readonly', os => os.get('github_token'));
   
   if (!ownerSetting?.value || !repoSetting?.value || !tokenSetting?.value) {
@@ -191,11 +195,11 @@ async function loadFromGitHub() {
     return;
   }
 
-  const owner = ownerSetting.value;
-  const repo = repoSetting.value;
-  const token = tokenSetting.value;
+  const owner  = ownerSetting.value;
+  const repo   = repoSetting.value;
+  const token  = tokenSetting.value;
 
-  const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
+  const getUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3.raw' };
 
   try {
@@ -209,10 +213,14 @@ async function loadFromGitHub() {
       await db('entries', 'readwrite', os => os.clear());
 
       if (Array.isArray(data.products)) {
-        for (const p of data.products) await db('products', 'readwrite', os => os.add(p));
+        for (const p of data.products) {
+          await db('products', 'readwrite', os => os.add(p));
+        }
       }
       if (Array.isArray(data.entries)) {
-        for (const e of data.entries) await db('entries', 'readwrite', os => os.add(e));
+        for (const e of data.entries) {
+          await db('entries', 'readwrite', os => os.add(e));
+        }
       }
 
       refreshProducts();
