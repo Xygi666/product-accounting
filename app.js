@@ -144,21 +144,31 @@ async function syncToGitHub() {
 
   const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' };
+  
   let sha = null;
-
   const getResp = await fetch(getUrl, { headers });
   console.log('GET data.json status:', getResp.status);
   if (getResp.ok) {
     const fileData = await getResp.json();
     sha = fileData.sha;
-  } else {
+  } else if (getResp.status !== 404) {
     console.warn('GET data.json error:', await getResp.text());
+  }
+
+  // Формируем тело запроса с добавлением sha только если он есть
+  const bodyObj = {
+    message: 'Backup update',
+    content: content
+  };
+
+  if (sha) {
+    bodyObj.sha = sha;
   }
 
   const putResp = await fetch(getUrl, {
     method: 'PUT',
     headers,
-    body: JSON.stringify({ message: 'Backup update', content, sha })
+    body: JSON.stringify(bodyObj)
   });
 
   console.log('PUT status:', putResp.status);
