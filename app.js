@@ -33,15 +33,14 @@ document.querySelectorAll('nav button').forEach(btn => {
   });
 });
 
-// ===== Загрузка данных =====
+// ===== Обновление интерфейса =====
 async function refreshProducts() {
   const products = await db('products', 'readonly', os => os.getAll());
   $('#product-select').innerHTML = products.map(
     p => `<option value="${p.id}" data-price="${p.price}">${p.name}</option>`
   ).join('');
   $('#product-list').innerHTML = products.map(
-    p => `<li>${p.name} — ${p.price} ₽
-           <button onclick="deleteProduct(${p.id})">✕</button></li>`
+    p => `<li>${p.name} — ${p.price} ₽ <button onclick="deleteProduct(${p.id})">✕</button></li>`
   ).join('') || '<li>Нет данных</li>';
 }
 
@@ -65,7 +64,7 @@ async function loadMonthSum() {
   $('#month-total').textContent = total + ' ₽';
 }
 
-// ===== Операции с продуктами и записями =====
+// ===== Операции с данными =====
 async function deleteProduct(id) {
   await db('products', 'readwrite', os => os.delete(id));
   refreshProducts();
@@ -124,7 +123,7 @@ $('#clear-data-btn').addEventListener('click', async () => {
   }
 });
 
-// ===== Синхронизация на GitHub =====
+// ===== СИНХронизация с GitHub =====
 async function syncToGitHub() {
   const ownerSetting = await db('settings', 'readonly', os => os.get('github_owner'));
   const repoSetting = await db('settings', 'readonly', os => os.get('github_repo'));
@@ -143,10 +142,10 @@ async function syncToGitHub() {
   const backup = { products, entries, updated: new Date().toISOString() };
   const content = btoa(unescape(encodeURIComponent(JSON.stringify(backup, null, 2))));
 
-  // Получаем SHA, если файл уже есть
   const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' };
   let sha = null;
+
   const getResp = await fetch(getUrl, { headers });
   console.log('GET data.json status:', getResp.status);
   if (getResp.ok) {
@@ -159,11 +158,7 @@ async function syncToGitHub() {
   const putResp = await fetch(getUrl, {
     method: 'PUT',
     headers,
-    body: JSON.stringify({
-      message: 'Backup update',
-      content,
-      sha
-    })
+    body: JSON.stringify({ message: 'Backup update', content, sha })
   });
 
   console.log('PUT status:', putResp.status);
@@ -178,12 +173,62 @@ async function syncToGitHub() {
   }
 }
 
+// ===== АВТОИМПОРТ с GitHub =====
+async function loadFromGitHub() {
+  const ownerSetting = await db('settings','readonly', os => os.get('github_owner'));
+  const repoSetting = await db('settings','readonly', os => os.get('github_repo'));
+  const tokenSetting = await db('settings','readonly', os => os.get('github_token'));
+  
+  if (!ownerSetting?.value || !repoSetting?.value || !tokenSetting?.value) {
+    console.log('Нет настроек GitHub, пропускаем автозагрузку');
+    return;
+  }
+
+  const owner = ownerSetting.value;
+  const repo = repoSetting.value;
+  const token = tokenSetting.value;
+
+  const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
+  const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3.raw' };
+
+  try {
+    const response = await fetch(getUrl, { headers });
+    if (response.ok) {
+      const text = await response.text();
+      const data = JSON.parse(text);
+      console.log('Загружено с GitHub:', data);
+
+      await db('products', 'readwrite', os => os.clear());
+      await db('entries', 'readwrite', os => os.clear());
+
+      if (Array.isArray(data.products)) {
+        for (const p of data.products) await db('products', 'readwrite', os => os.add(p));
+      }
+      if (Array.isArray(data.entries)) {
+        for (const e of data.entries) await db('entries', 'readwrite', os => os.add(e));
+      }
+
+      refreshProducts();
+      loadToday();
+      loadMonthSum();
+      updateSyncStatus('⬇️ Данные загружены с GitHub');
+    } else {
+      console.warn('Ошибка загрузки data.json:', response.status);
+      updateSyncStatus('⚠️ Ошибка загрузки с GitHub');
+    }
+  } catch (e) {
+    console.error('Ошибка при загрузке с GitHub:', e);
+    updateSyncStatus('❌ Ошибка загрузки');
+  }
+}
+
 function updateSyncStatus(msg) {
   $('#sync-status').textContent = msg;
 }
 
 // ===== Инициализация =====
 (async function init() {
+  await loadFromGitHub();
   refreshProducts();
   loadToday();
   loadMonthSum();
