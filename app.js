@@ -33,7 +33,7 @@ document.querySelectorAll('nav button').forEach(btn => {
   });
 });
 
-// ===== Обновление UI =====
+// ===== Отрисовка =====
 async function refreshProducts() {
   const products = await db('products', 'readonly', os => os.getAll());
   $('#product-select').innerHTML = products.map(
@@ -123,7 +123,7 @@ $('#clear-data-btn').addEventListener('click', async () => {
   }
 });
 
-// ===== Sync to GitHub =====
+// ===== Синхронизация на GitHub =====
 async function syncToGitHub() {
   const ownerSetting = await db('settings', 'readonly', os => os.get('github_owner'));
   const repoSetting  = await db('settings', 'readonly', os => os.get('github_repo'));
@@ -143,6 +143,7 @@ async function syncToGitHub() {
   const content  = btoa(unescape(encodeURIComponent(JSON.stringify(backup, null, 2))));
 
   const getUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
+  // Обязательно '+json' для получения sha
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' };
 
   let sha = null;
@@ -150,7 +151,7 @@ async function syncToGitHub() {
   console.log('GET data.json status:', getResp.status);
   if (getResp.ok) {
     const fileData = await getResp.json();
-    console.log('Ответ от GitHub (полный JSON):', fileData);
+    console.log('Ответ от GitHub (метаданные):', fileData);
     if (fileData && typeof fileData.sha === 'string') {
       sha = fileData.sha;
     }
@@ -163,7 +164,7 @@ async function syncToGitHub() {
   if (sha) {
     bodyObj.sha = sha;
   } else {
-    console.log('sha нет → создаём файл заново');
+    console.log('sha нет → файл создаётся впервые');
   }
 
   console.log('Отправляем PUT с телом:', bodyObj);
@@ -184,7 +185,7 @@ async function syncToGitHub() {
   }
 }
 
-// ===== Автоимпорт =====
+// ===== Автоимпорт с GitHub =====
 async function loadFromGitHub() {
   const ownerSetting = await db('settings','readonly', os => os.get('github_owner'));
   const repoSetting  = await db('settings','readonly', os => os.get('github_repo'));
@@ -200,6 +201,7 @@ async function loadFromGitHub() {
   const token  = tokenSetting.value;
 
   const getUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
+  // Здесь raw — чтобы получить голое содержимое JSON
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3.raw' };
 
   try {
@@ -207,7 +209,7 @@ async function loadFromGitHub() {
     if (response.ok) {
       const text = await response.text();
       const data = JSON.parse(text);
-      console.log('Загружено с GitHub:', data);
+      console.log('Загружено содержимое с GitHub:', data);
 
       await db('products', 'readwrite', os => os.clear());
       await db('entries', 'readwrite', os => os.clear());
@@ -241,7 +243,7 @@ function updateSyncStatus(msg) {
   $('#sync-status').textContent = msg;
 }
 
-// ===== init =====
+// ===== INIT =====
 (async function init() {
   await loadFromGitHub();
   refreshProducts();
