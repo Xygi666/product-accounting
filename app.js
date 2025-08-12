@@ -33,7 +33,7 @@ document.querySelectorAll('nav button').forEach(btn => {
   });
 });
 
-// ===== Интерфейс =====
+// ===== Обновление UI =====
 async function refreshProducts() {
   const products = await db('products', 'readonly', os => os.getAll());
   $('#product-select').innerHTML = products.map(
@@ -64,7 +64,7 @@ async function loadMonthSum() {
   $('#month-total').textContent = total + ' ₽';
 }
 
-// ===== Операции с товарами и записями =====
+// ===== CRUD =====
 async function deleteProduct(id) {
   await db('products', 'readwrite', os => os.delete(id));
   refreshProducts();
@@ -104,7 +104,7 @@ $('#add-btn').addEventListener('click', async () => {
   syncToGitHub();
 });
 
-// ===== Настройки и очистка =====
+// ===== Настройки =====
 $('#save-github-btn').addEventListener('click', async () => {
   await db('settings', 'readwrite', os => os.put({ key: 'github_owner', value: $('#github-owner').value.trim() }));
   await db('settings', 'readwrite', os => os.put({ key: 'github_repo', value: $('#github-repo').value.trim() }));
@@ -123,7 +123,7 @@ $('#clear-data-btn').addEventListener('click', async () => {
   }
 });
 
-// ===== Синхронизация с GitHub =====
+// ===== Sync to GitHub =====
 async function syncToGitHub() {
   const ownerSetting = await db('settings', 'readonly', os => os.get('github_owner'));
   const repoSetting = await db('settings', 'readonly', os => os.get('github_repo'));
@@ -144,20 +144,23 @@ async function syncToGitHub() {
 
   const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' };
-  
+
   let sha = null;
   const getResp = await fetch(getUrl, { headers });
   console.log('GET data.json status:', getResp.status);
   if (getResp.ok) {
     const fileData = await getResp.json();
+    console.log('Ответ GET от GitHub:', fileData);
     sha = fileData.sha;
-    console.log('Полученный sha:', sha);
   } else if (getResp.status !== 404) {
     console.warn('Ошибка GET data.json:', await getResp.text());
   }
 
   const bodyObj = { message: 'Backup update', content };
-  if (sha) { bodyObj.sha = sha; }
+  if (typeof sha === 'string' && sha.length > 0) {
+    bodyObj.sha = sha;
+  }
+
   console.log('Тело PUT-запроса:', bodyObj);
 
   const putResp = await fetch(getUrl, {
@@ -177,7 +180,7 @@ async function syncToGitHub() {
   }
 }
 
-// ===== Автоимпорт с GitHub при старте =====
+// ===== Автоимпорт =====
 async function loadFromGitHub() {
   const ownerSetting = await db('settings','readonly', os => os.get('github_owner'));
   const repoSetting = await db('settings','readonly', os => os.get('github_repo'));
