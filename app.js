@@ -33,7 +33,7 @@ document.querySelectorAll('nav button').forEach(btn => {
   });
 });
 
-// ===== Отрисовка =====
+// ===== Обновление UI =====
 async function refreshProducts() {
   const products = await db('products', 'readonly', os => os.getAll());
   $('#product-select').innerHTML = products.map(
@@ -143,7 +143,8 @@ async function syncToGitHub() {
   const content  = btoa(unescape(encodeURIComponent(JSON.stringify(backup, null, 2))));
 
   const getUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
-  // Обязательно '+json' для получения sha
+  
+  // Получаем метаданные с sha
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' };
 
   let sha = null;
@@ -201,7 +202,8 @@ async function loadFromGitHub() {
   const token  = tokenSetting.value;
 
   const getUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/data.json`;
-  // Здесь raw — чтобы получить голое содержимое JSON
+  
+  // raw, чтобы получить голое содержимое файла
   const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3.raw' };
 
   try {
@@ -243,7 +245,7 @@ function updateSyncStatus(msg) {
   $('#sync-status').textContent = msg;
 }
 
-// ===== INIT =====
+// ===== init =====
 (async function init() {
   await loadFromGitHub();
   refreshProducts();
