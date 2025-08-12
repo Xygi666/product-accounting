@@ -1,4 +1,4 @@
-// ===== Работа с IndexedDB =====
+// ===== IndexedDB =====
 const dbPromise = new Promise((resolve, reject) => {
   const open = indexedDB.open('productionDB', 1);
   open.onupgradeneeded = () => {
@@ -33,7 +33,7 @@ document.querySelectorAll('nav button').forEach(btn => {
   });
 });
 
-// ===== Обновление интерфейса =====
+// ===== Интерфейс =====
 async function refreshProducts() {
   const products = await db('products', 'readonly', os => os.getAll());
   $('#product-select').innerHTML = products.map(
@@ -64,7 +64,7 @@ async function loadMonthSum() {
   $('#month-total').textContent = total + ' ₽';
 }
 
-// ===== Операции с данными =====
+// ===== Операции с товарами и записями =====
 async function deleteProduct(id) {
   await db('products', 'readwrite', os => os.delete(id));
   refreshProducts();
@@ -123,7 +123,7 @@ $('#clear-data-btn').addEventListener('click', async () => {
   }
 });
 
-// ===== СИНХронизация с GitHub =====
+// ===== Синхронизация с GitHub =====
 async function syncToGitHub() {
   const ownerSetting = await db('settings', 'readonly', os => os.get('github_owner'));
   const repoSetting = await db('settings', 'readonly', os => os.get('github_repo'));
@@ -151,21 +151,14 @@ async function syncToGitHub() {
   if (getResp.ok) {
     const fileData = await getResp.json();
     sha = fileData.sha;
-    console.log('Полученный sha для data.json:', sha);
+    console.log('Полученный sha:', sha);
   } else if (getResp.status !== 404) {
-    console.warn('GET data.json error:', await getResp.text());
+    console.warn('Ошибка GET data.json:', await getResp.text());
   }
 
-  const bodyObj = {
-    message: 'Backup update',
-    content: content
-  };
-
-  if (sha) {
-    bodyObj.sha = sha;
-  } else {
-    console.log('sha отсутствует - файл создаётся впервые');
-  }
+  const bodyObj = { message: 'Backup update', content };
+  if (sha) { bodyObj.sha = sha; }
+  console.log('Тело PUT-запроса:', bodyObj);
 
   const putResp = await fetch(getUrl, {
     method: 'PUT',
@@ -180,12 +173,11 @@ async function syncToGitHub() {
   if (putResp.ok) {
     updateSyncStatus('✅ Бэкап на GitHub сохранён');
   } else {
-    const errMsg = respJson?.message || 'Неизвестная ошибка';
-    updateSyncStatus(`⚠️ Ошибка GitHub sync: ${errMsg}`);
+    updateSyncStatus(`⚠️ Ошибка GitHub sync: ${respJson.message || 'Неизвестная ошибка'}`);
   }
 }
 
-// ===== АВТОИМПОРТ с GitHub =====
+// ===== Автоимпорт с GitHub при старте =====
 async function loadFromGitHub() {
   const ownerSetting = await db('settings','readonly', os => os.get('github_owner'));
   const repoSetting = await db('settings','readonly', os => os.get('github_repo'));
@@ -238,7 +230,7 @@ function updateSyncStatus(msg) {
   $('#sync-status').textContent = msg;
 }
 
-// ===== Инициализация =====
+// ===== init =====
 (async function init() {
   await loadFromGitHub();
   refreshProducts();
